@@ -1,36 +1,48 @@
-use pnet_datalink::MacAddr;
-use pnet_packet::{ethernet::{self, MutableEthernetPacket,EtherTypes}, ipv4::{MutableIpv4Packet, Ipv4Flags}, ip::IpNextHeaderProtocols};
+use my_scan::tcp::packet::build_packet;
+use pnet_datalink::Channel;
+use std::env;
 use std::net::Ipv4Addr;
+use std::str::FromStr;
+use tokio::spawn;
+#[tokio::main]
+async fn main() {
+    //let args:Vec<String> = env::args().collect();
+    let interface_name = "wlx08beac0c886c".to_string();
+    let dstip_addr = "127.0.0.1";
+    let start_port = "50";
+    let end_port = "1000";
+    let interfaces = pnet_datalink::interfaces();
+    let interface = interfaces
+        .into_iter()
+        .filter(|_interface| _interface.name == interface_name)
+        .next()
+        .expect(&format!("can not find interface {}", interface_name));
 
-fn build_packet(source_ip: Ipv4Addr, dst_ip: Ipv4Addr, dst_port: u16, src_mac_addr: MacAddr, tmp_packet:&mut [u8]) {
-    const ETHERNET_HEADER_LEN: usize = 14;
-    const IPV4_HEADER_LEN: usize = 20;
-
-    {
-        let mut eth_header =  MutableEthernetPacket::new(&mut tmp_packet[..ETHERNET_HEADER_LEN]).unwrap();
-        eth_header.set_destination(MacAddr::broadcast());
-        eth_header.set_ethertype(EtherTypes::Ipv4);
-        eth_header.set_source(src_mac_addr);
-    }
-
-    {
-        let mut ip_header = MutableIpv4Packet::new(&mut tmp_packet[ETHERNET_HEADER_LEN..(ETHERNET_HEADER_LEN+IPV4_HEADER_LEN)]).unwrap();
-        ip_header.set_header_length(69);
-        ip_header.set_total_length(52);
-        ip_header.set_next_level_protocol(IpNextHeaderProtocols::Tcp);
-        ip_header.set_source(source_ip);
-        ip_header.set_destination(dst_ip);
-        ip_header.set_identification(rand::random::<u16>());
-        ip_header.set_ttl(64);
-        ip_header.set_version(4);
-        ip_header.set_flags(Ipv4Flags::DontFragment);
-        let checksum = pnet_packet::ipv4::checksum(&ip_header.to_immutable());
-        ip_header.set_checksum(checksum);
-    }
-
-    
-}
-
-fn main() {
-    println!("Hello, world!");
+    let source_ip = match interface.ips.iter().nth(0) {
+        Some(_ip) => match _ip.ip() {
+            std::net::IpAddr::V4(ipv4) => ipv4,
+            std::net::IpAddr::V6(ipv6) => {
+                panic!("don't support ipv6!");
+            }
+        },
+        None => {
+            panic!("this interface doesn't have an ip address!");
+        }
+    };
+    let dst_ip = Ipv4Addr::from_str(dstip_addr).expect("not a valid dst ip");
+    let src_mac_addr = interface.mac.unwrap();
+    let (mut tx, mut rx) = match pnet_datalink::channel(&interface, Default::default()) {
+        Ok(Channel::Ethernet(tx, rx)) => (tx, rx),
+        Ok(_) => panic!("Unknown channel type"),
+        Err(e) => panic!("Error happened {}", e),
+    };
+    tokio::spawn(async move {
+        let sp = u16::from_str(start_port).expect("start port no valid");
+        let ep = u16::from_str(end_port).expect("end port no valid");
+        for dst_port in sp..ep+1 {
+            tx.build_and_send(1,66,&mut |packet: &mut[u8]| {
+                build_packet(source_ip, src_mac_addr, dst_ip, dst_port, packet);
+            });
+        }
+    });
 }
