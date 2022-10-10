@@ -1,5 +1,5 @@
 use pnet_datalink::MacAddr;
-use pnet_packet::{ethernet::{self, MutableEthernetPacket,EtherTypes}, ipv4::MutableIpv4Packet};
+use pnet_packet::{ethernet::{self, MutableEthernetPacket,EtherTypes}, ipv4::{MutableIpv4Packet, Ipv4Flags}, ip::IpNextHeaderProtocols};
 use std::net::Ipv4Addr;
 
 fn build_packet(source_ip: Ipv4Addr, dst_ip: Ipv4Addr, dst_port: u16, src_mac_addr: MacAddr, tmp_packet:&mut [u8]) {
@@ -16,8 +16,19 @@ fn build_packet(source_ip: Ipv4Addr, dst_ip: Ipv4Addr, dst_port: u16, src_mac_ad
     {
         let mut ip_header = MutableIpv4Packet::new(&mut tmp_packet[ETHERNET_HEADER_LEN..(ETHERNET_HEADER_LEN+IPV4_HEADER_LEN)]).unwrap();
         ip_header.set_header_length(69);
-        ip_header
+        ip_header.set_total_length(52);
+        ip_header.set_next_level_protocol(IpNextHeaderProtocols::Tcp);
+        ip_header.set_source(source_ip);
+        ip_header.set_destination(dst_ip);
+        ip_header.set_identification(rand::random::<u16>());
+        ip_header.set_ttl(64);
+        ip_header.set_version(4);
+        ip_header.set_flags(Ipv4Flags::DontFragment);
+        let checksum = pnet_packet::ipv4::checksum(&ip_header.to_immutable());
+        ip_header.set_checksum(checksum);
     }
+
+    
 }
 
 fn main() {
