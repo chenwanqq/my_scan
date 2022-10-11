@@ -1,4 +1,4 @@
-use my_scan::tcp::packet::build_packet;
+use my_scan::tcp::packet::{build_packet,handle_receive_packet};
 use pnet_datalink::Channel;
 use std::collections::HashSet;
 use std::env;
@@ -7,7 +7,6 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tokio::spawn;
 use my_scan::result::result::ScanResult;
-
 #[tokio::main]
 async fn main() {
     //let args:Vec<String> = env::args().collect();
@@ -53,11 +52,10 @@ async fn main() {
         }
     });
 
-    {
-        let scanResult = scanResult.clone();
-        let receive_thread = tokio::spawn(async move {
-            
-        });
-    }
+    let mut scanResult = scanResult.clone();
+    let receive_thread = tokio::spawn(async move {
+        handle_receive_packet(&mut rx, &mut scanResult).await;
+    });
     send_thread.await; 
+    receive_thread.await;
 }

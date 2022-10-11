@@ -3,12 +3,12 @@ pub mod packet {
     use pnet_packet::{
         ethernet::{self, EtherTypes, EthernetPacket, MutableEthernetPacket},
         ip::IpNextHeaderProtocols,
-        ipv4::{Ipv4Flags, MutableIpv4Packet},
-        tcp::{MutableTcpPacket, TcpFlags, TcpOption},
+        ipv4::{Ipv4Flags, MutableIpv4Packet,Ipv4Packet},
+        tcp::{MutableTcpPacket, TcpFlags, TcpOption}, Packet,
     };
-    use std::net::Ipv4Addr;
+    use std::{net::Ipv4Addr, fmt::Error};
 
-    use crate::result::result::ScanResult;
+    use crate::result::result::{ScanResult, PortInfo};
 
     pub fn build_packet(
         source_ip: Ipv4Addr,
@@ -70,22 +70,38 @@ pub mod packet {
             tcp_header.set_checksum(checksum);
         }
     }
-    pub fn handle_receive_packet(
+    pub async fn handle_receive_packet(
         rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>,
         scanResult: &mut ScanResult,
     ) {
-        match rx.next() {
-            Ok(_frame) => {
-                let frame = EthernetPacket::new(_frame).unwrap();
-                match frame.get_ethertype() {
-                    pnet_packet::ethernet::EtherTypes::Ipv4 => {}
-                    pnet_packet::ethernet::EtherTypes::Ipv6 => {
-                        println!("ipv6 not supported");
-                    }
-                    _ => {}
-                };
+        loop {
+            match rx.next() {
+                Ok(_frame) => {
+                    let frame = EthernetPacket::new(_frame).unwrap();
+                    match frame.get_ethertype() {
+                        pnet_packet::ethernet::EtherTypes::Ipv4 => {}
+                        pnet_packet::ethernet::EtherTypes::Ipv6 => {
+                            println!("ipv6 not supported");
+                        }
+                        _ => {}
+                    };
+                }
+                Err(_) => {}
+            };
+        }
+    }
+    fn ipv4Handler(frame: EthernetPacket) -> Result<PortInfo,&'static str> {
+        match Ipv4Packet::new(frame.payload()) {
+            Some(packet) => {
+                if packet.get_next_level_protocol() == pnet_packet::ip::IpNextHeaderProtocols::Tcp {
+                    
+                } else {
+                    return Err("packet not supported");
+                }
+            },
+            None => {
+                return Err("no legal ipv4 packet!");
             }
-            Err(_) => {}
         };
     }
 }
