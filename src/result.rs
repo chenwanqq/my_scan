@@ -5,8 +5,8 @@ pub mod result {
 
     #[derive(PartialEq,Eq,Hash,Clone, Copy, Debug)]
     pub struct PortInfo {
-        ip:Ipv4Addr,
-        port:u16
+        pub ip:Ipv4Addr,
+        pub port:u16
     }
     pub type ScanResult = Arc<Mutex<HashSet<PortInfo>>>;
 }

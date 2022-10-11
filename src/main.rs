@@ -10,10 +10,10 @@ use my_scan::result::result::ScanResult;
 #[tokio::main]
 async fn main() {
     //let args:Vec<String> = env::args().collect();
-    let interface_name = "wlx08beac0c886c".to_string();
+    let interface_name = "enp9s0".to_string();
     let dstip_addr = "127.0.0.1";
-    let start_port = "50";
-    let end_port = "1000";
+    let start_port = "1088";
+    let end_port = "1090";
     let interfaces = pnet_datalink::interfaces();
     let interface = interfaces
         .into_iter()
@@ -56,6 +56,5 @@ async fn main() {
     let receive_thread = tokio::spawn(async move {
         handle_receive_packet(&mut rx, &mut scanResult).await;
     });
-    send_thread.await; 
     receive_thread.await;
 }

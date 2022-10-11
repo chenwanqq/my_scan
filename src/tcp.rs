@@ -4,7 +4,7 @@ pub mod packet {
         ethernet::{self, EtherTypes, EthernetPacket, MutableEthernetPacket},
         ip::IpNextHeaderProtocols,
         ipv4::{Ipv4Flags, MutableIpv4Packet,Ipv4Packet},
-        tcp::{MutableTcpPacket, TcpFlags, TcpOption}, Packet,
+        tcp::{MutableTcpPacket, TcpFlags, TcpOption, TcpPacket, self}, Packet, ipv6::Ipv6Packet,
     };
     use std::{net::Ipv4Addr, fmt::Error};
 
@@ -79,10 +79,20 @@ pub mod packet {
                 Ok(_frame) => {
                     let frame = EthernetPacket::new(_frame).unwrap();
                     match frame.get_ethertype() {
-                        pnet_packet::ethernet::EtherTypes::Ipv4 => {}
+                        pnet_packet::ethernet::EtherTypes::Ipv4 => {
+                            match ipv4Handler(frame) {
+                                Ok(port_info) => {
+                                    scanResult.lock().unwrap().insert(port_info);        
+                                },
+                                Err(_) => {}
+                            };
+                            
+                        },
                         pnet_packet::ethernet::EtherTypes::Ipv6 => {
-                            println!("ipv6 not supported");
-                        }
+                            let ipv6_packet = Ipv6Packet::new(frame.payload()).unwrap();
+                            let ip = ipv6_packet.get_source();
+                            println!("ipv6: {}",ip);
+                        },
                         _ => {}
                     };
                 }
@@ -94,7 +104,18 @@ pub mod packet {
         match Ipv4Packet::new(frame.payload()) {
             Some(packet) => {
                 if packet.get_next_level_protocol() == pnet_packet::ip::IpNextHeaderProtocols::Tcp {
-                    
+                    if let Some(tcp_packet) = TcpPacket::new(packet.payload()) {
+                        if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::SYN | pnet_packet::tcp::TcpFlags::ACK {
+                            let portInfo = PortInfo {
+                                ip: packet.get_source(),
+                                port:tcp_packet.get_source()
+                            };
+                            println!("{},{}",portInfo.ip,portInfo.port);
+                            return Ok(portInfo);
+                        }
+                    } else {
+                        return Err("ipv4 handle wrong!");
+                    }
                 } else {
                     return Err("packet not supported");
                 }
@@ -103,5 +124,6 @@ pub mod packet {
                 return Err("no legal ipv4 packet!");
             }
         };
+        return Err("");
     }
 }
