@@ -1,9 +1,13 @@
 use my_scan::tcp::packet::build_packet;
 use pnet_datalink::Channel;
+use std::collections::HashSet;
 use std::env;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 use tokio::spawn;
+use my_scan::result::result::ScanResult;
+
 #[tokio::main]
 async fn main() {
     //let args:Vec<String> = env::args().collect();
@@ -36,7 +40,10 @@ async fn main() {
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
     };
-    tokio::spawn(async move {
+
+    let mut scanResult = Arc::new(Mutex::new(HashSet::new()));
+
+    let send_thread = tokio::spawn(async move {
         let sp = u16::from_str(start_port).expect("start port no valid");
         let ep = u16::from_str(end_port).expect("end port no valid");
         for dst_port in sp..ep+1 {
@@ -45,4 +52,12 @@ async fn main() {
             });
         }
     });
+
+    {
+        let scanResult = scanResult.clone();
+        let receive_thread = tokio::spawn(async move {
+            
+        });
+    }
+    send_thread.await; 
 }

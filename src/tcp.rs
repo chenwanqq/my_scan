@@ -1,12 +1,14 @@
 pub mod packet {
     use pnet_datalink::MacAddr;
     use pnet_packet::{
-        ethernet::{self, EtherTypes, MutableEthernetPacket},
+        ethernet::{self, EtherTypes, EthernetPacket, MutableEthernetPacket},
         ip::IpNextHeaderProtocols,
         ipv4::{Ipv4Flags, MutableIpv4Packet},
         tcp::{MutableTcpPacket, TcpFlags, TcpOption},
     };
     use std::net::Ipv4Addr;
+
+    use crate::result::result::ScanResult;
 
     pub fn build_packet(
         source_ip: Ipv4Addr,
@@ -67,5 +69,23 @@ pub mod packet {
                 pnet_packet::tcp::ipv4_checksum(&tcp_header.to_immutable(), &source_ip, &dst_ip);
             tcp_header.set_checksum(checksum);
         }
+    }
+    pub fn handle_receive_packet(
+        rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>,
+        scanResult: &mut ScanResult,
+    ) {
+        match rx.next() {
+            Ok(_frame) => {
+                let frame = EthernetPacket::new(_frame).unwrap();
+                match frame.get_ethertype() {
+                    pnet_packet::ethernet::EtherTypes::Ipv4 => {}
+                    pnet_packet::ethernet::EtherTypes::Ipv6 => {
+                        println!("ipv6 not supported");
+                    }
+                    _ => {}
+                };
+            }
+            Err(_) => {}
+        };
     }
 }
