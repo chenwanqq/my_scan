@@ -6,7 +6,7 @@ pub mod packet {
         ipv4::{Ipv4Flags, MutableIpv4Packet,Ipv4Packet},
         tcp::{MutableTcpPacket, TcpFlags, TcpOption, TcpPacket, self}, Packet, ipv6::Ipv6Packet,
     };
-    use std::{net::Ipv4Addr, fmt::Error};
+    use std::{net::Ipv4Addr, fmt::Error, str::FromStr};
 
     use crate::result::result::{ScanResult, PortInfo};
 
@@ -89,9 +89,12 @@ pub mod packet {
                             
                         },
                         pnet_packet::ethernet::EtherTypes::Ipv6 => {
-                            let ipv6_packet = Ipv6Packet::new(frame.payload()).unwrap();
-                            let ip = ipv6_packet.get_source();
-                            println!("ipv6: {}",ip);
+                            match ipv6Handler(frame) {
+                                Ok(port_info) => {
+                                    scanResult.lock().unwrap().insert(port_info);        
+                                },
+                                Err(_) => {}
+                            };
                         },
                         _ => {}
                     };
@@ -99,6 +102,34 @@ pub mod packet {
                 Err(_) => {}
             };
         }
+    }
+    fn ipv6Handler(frame: EthernetPacket) -> Result<PortInfo,&'static str> {
+        match Ipv6Packet::new(frame.payload()) {
+            Some(packet) => {
+                if packet.get_next_header() == pnet_packet::ip::IpNextHeaderProtocols::Tcp {
+                    if let Some(tcp_packet) = TcpPacket::new(packet.payload()) {
+                        let portInfo = PortInfo {
+                            ip: Ipv4Addr::from_str("127.0.0.1").unwrap(),
+                            port:tcp_packet.get_source()
+                        };
+                        println!("{},{}",portInfo.ip,portInfo.port);
+                        if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::SYN | pnet_packet::tcp::TcpFlags::ACK {
+                            return Ok(portInfo);
+                        }
+
+                    } else {
+                        println!("ipv6 tcp handle wrong");
+                        return Err("ipv6 tcp handle wrong");
+                    }
+                } else {
+                    return Err("only support tcp");
+                }
+            },
+            None => {
+                return Err("no legal ipv6 packet!");
+            }
+        }
+        return Err("some ipv6 error");
     }
     fn ipv4Handler(frame: EthernetPacket) -> Result<PortInfo,&'static str> {
         match Ipv4Packet::new(frame.payload()) {
@@ -114,7 +145,7 @@ pub mod packet {
                             return Ok(portInfo);
                         }
                     } else {
-                        return Err("ipv4 handle wrong!");
+                        return Err("ipv4 tcp handle wrong!");
                     }
                 } else {
                     return Err("packet not supported");
