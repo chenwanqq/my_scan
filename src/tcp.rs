@@ -122,10 +122,12 @@ pub mod packet {
                         return Err("ipv6 tcp handle wrong");
                     }
                 } else {
+                    println!("only support tcp");
                     return Err("only support tcp");
                 }
             },
             None => {
+                println!("no legal ipv6 packet!");
                 return Err("no legal ipv6 packet!");
             }
         }
